@@ -3,7 +3,7 @@ import cb104_addr
 
 papername = "apple"
 
-conn=MySQLdb.connect(host=cb104_addr.ray_MySQL_IP, user="root",
+conn=MySQLdb.connect(host=cb104_addr.ray_MySQL_IP, user=cb104_addr.ray_MySQL_username,
                      passwd=cb104_addr.ray_MySQL_password, db="news", charset="utf8")
 cursor=conn.cursor()           #傳回 Cursor 物件
 
