@@ -1,27 +1,33 @@
-import json, datetime
+import json, datetime, sys
 from pymongo import MongoClient
 from datetime import datetime
 import MySQLdb
 import jieba.analyse
 import cb104_addr
 
-# ==========DB 參數
-mysql_host = cb104_addr.ray_MySQL_IP
-mysql_username = cb104_addr.ray_MySQL_username
-mysql_password = cb104_addr.ray_MySQL_password
-mysql_dbname = "news"
-mysql_tablename = "test_news"
+paper_name = "udn"
 
-paper_name = "apple"
-conn = MongoClient("127.0.0.1")
-mdb = conn.news
-mcollection = mdb[paper_name + "_news"]
+mongodb_db_host = cb104_addr.local_mongodb_host
+mongodb_db_name = "news"
+mongodb_collection = paper_name + "_news"
 
-jieba.load_userdict("dict.txt")
+mariadb_host = cb104_addr.local_mariadb_host
+mariadb_user = cb104_addr.local_mariadb_user
+mariadb_pw = cb104_addr.local_mariadb_pw
+mariadb_db_name = "news_db"
+mariadb_tablename = paper_name + "_news"
+
+jieba.load_userdict("詞庫B2.txt")
+# ===============================
+
+conn_md = MongoClient(mongodb_db_host)
+mdb = conn_md[mongodb_db_name]
+mcollection = mdb[mongodb_collection]
 
 
 # 更新資料庫views
 def update_views(views_list, url):
+    global cursor
     sql_value_def = ""
     for i in range(72):
         if views_list[i] is not None:
@@ -29,8 +35,7 @@ def update_views(views_list, url):
     if sql_value_def == "":
         return
     sql_value_def = sql_value_def[:-1]
-    sql_command_def = "update " + mysql_tablename + " set " + sql_value_def + \
-                  " where url = '" + url + "';"
+    sql_command_def = "update " + mariadb_tablename + " set " + sql_value_def + " where url = '" + url + "';"
     # print(sql_command_def)
     # print("views update OK")
     cursor.execute(sql_command_def)
@@ -39,41 +44,48 @@ def update_views(views_list, url):
 
 # keyword
 def update_keyword(title_kw, news_kw, url):
+    global cursor
     sql_value_def = ""
-    for i3 in range(3):
+    for i3 in range(min(3, len(title_kw))):
         if title_kw[i3] is not None:
             sql_value_def = sql_value_def + "title_keyword_" + str(i3 + 1) + \
                         "='" + str(title_kw[i3]) + "',"
-    for i3 in range(20):
+    for i3 in range(min(20, len(news_kw))):
         if news_kw[i3] is not None:
             sql_value_def = sql_value_def + "keyword_" + str(i3 + 1) + "='" + str(news_kw[i3]) + "',"
     if sql_value_def == "":
         return
 
     sql_value_def = sql_value_def[:-1]
-    sql_command_def = "update " + mysql_tablename + " set " + sql_value_def + \
+    sql_command_def = "update " + mariadb_tablename + " set " + sql_value_def + \
                       " where url = '" + url + "';"
     # print(sql_command_def)
     # print("keyword update OK")
     cursor.execute(sql_command_def)
     # conn.commit()
 
-count = 0
 
+count = 0
 # 連線資料庫
-conn = MySQLdb.connect(host=mysql_host, user=mysql_username, passwd=mysql_password, db=mysql_dbname, charset="utf8")
+conn = MySQLdb.connect(host=mariadb_host, user=mariadb_user, passwd=mariadb_pw, db=mariadb_db_name, charset="utf8")
 cursor = conn.cursor()  # 傳回 Cursor 物件
-try:
-    for news_data in mcollection.find({}):
-        # print(news_data)
-        count = count +1
+for news_data in mcollection.find({}):
+    try:
+        count = count + 1
         if count % 100 == 0:
             print("處理檔案數:", count)
             conn.commit()
+            cursor.close()
+            conn.close()
+            conn = MySQLdb.connect(host=mariadb_host, user=mariadb_user, passwd=mariadb_pw, db=mariadb_db_name,
+                                   charset="utf8")
+            cursor = conn.cursor()
         news_create_time = datetime.strptime(news_data["news_create_time"], '%Y-%m-%d %H:%M')
         news_time_temp = []
         news_view_temp = []
         # print(news_data)
+        if "news_view" not in news_data:
+            continue
         for news_view_single in news_data["news_view"]:
             # print(news_view_single)
             time1 = datetime.strptime(news_view_single["time"], '%Y-%m-%d %H:%M')
@@ -85,7 +97,7 @@ try:
                 news_view_temp.append(int(news_view_single["view"]))
                 news_time_temp.append(time_delta)
 
-        # 資料時間差超過多少就不內差(先設定12小時)
+        # 資料時間差超過多少就不內插(先設定12小時)
         # 整理views資料至1小時一筆
         list_save = []
         for i in range(72):
@@ -135,10 +147,9 @@ try:
         if not len(list_save) == 72:
             print("views資料個數有問題")
 
-
         try:
             # 先判斷有沒有這個url
-            sql_command = "select * from " + mysql_tablename + " where url = '" + news_data["news_link"] + "';"
+            sql_command = "select * from " + mariadb_tablename + " where url = '" + news_data["news_link"] + "';"
             # print(sql_command)
             cursor.execute(sql_command)
             finded_data = cursor.fetchall()
@@ -160,7 +171,7 @@ try:
                     sql_value = sql_value + ",'" + news_key_word[i] + "'"
 
                 sql_command = \
-                    "insert into " + mysql_tablename + "(url,create_time,title,tag" + sql_column_name + \
+                    "insert into " + mariadb_tablename + "(url,create_time,title,tag" + sql_column_name + \
                     ") values('" + news_data["news_link"] + "','" + news_data["news_create_time"] + "','" + \
                     news_data["news_title"] + "','" + news_data["news_tag"]\
                     + "'" + sql_value + ");"
@@ -175,21 +186,21 @@ try:
             elif data_count == 1:
                 # 有資料 先比對keyword
                 error_check = False
-                for i_tk in range(3):
+                for i_tk in range(min(3, len(title_key_word))):
                     if not title_key_word[i_tk] == finded_data[0][i_tk + 3]:
                         error_check = True
                         break
-                for i_kw in range(20):
+                for i_kw in range(min(20, len(news_key_word))):
                     if not news_key_word[i_kw] == finded_data[0][i_kw+7]:
                         error_check = True
                         break
-                # 有不宜一樣的就更新keyword
+                # 有不一樣的就更新keyword
                 if error_check:
                     update_keyword(title_key_word, news_key_word, news_data["news_link"])
 
                 # 比對views
                 for i2 in range(72):
-                    if list_save[i] is not None and not list_save[i2] == finded_data[0][i2 + 27]:
+                    if list_save[i2] is not None and not list_save[i2] == finded_data[0][i2 + 27]:
                         # 執行update
                         update_views(list_save, news_data["news_link"])
                         break
@@ -199,8 +210,10 @@ try:
             # print("done")
 
         except Exception as e:
+            print("error 1")
             print(e)
-except Exception as e:
-    print(e)
+    except Exception as e:
+        print("error 2")
+        print(e)
 cursor.close()
 conn.close()

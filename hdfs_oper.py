@@ -1,18 +1,10 @@
-# install hdfs
-from hdfs import InsecureClient, Config
 from hdfs.client import Client
-import json
-from pymongo import MongoClient
-# client = InsecureClient('http://10.120.14.110:50070', user='root')
-
-# client = Config().get_client('dev')
-
-# with client.read('/') as reader:
-#   features = reader.read()
-#   print(features)
 
 
-def read_hdfs_file(client , filename):
+# 因為設定上的原因
+# 要先到 C:\Windows\System32\drivers\etc 設定
+# 10.120.14.110 master 等等
+def read_hdfs_file(client, filename):
     # with client.read('samples.csv', encoding='utf-8', delimiter='\n') as reader:
     #  for line in reader:
     # pass
@@ -64,32 +56,5 @@ def move_or_rename(client, hdfs_src_path, hdfs_dst_path):
 def list(client, hdfs_path):
     return client.list(hdfs_path, status=False)
 
-# client = Client(url, root=None, proxy=None, timeout=None, session=None)
-# client = Client("http://hadoop:50070")
-
 
 client = Client(url="http://master:50070", root="/", timeout=10000, session=False)
-# client = InsecureClient("http://120.78.186.82:50070", user='ann');
-
-# rootfile = list(client, "/")
-#print(rootfile)
-
-# filename = "/CT_news_data/news/2019-02-01_CT_news.json"
-# get_from_hdfs(client, filename, "./")
-
-# client.read(filename, encoding="utf-8")
-# with client.read(filename, encoding="utf-8") as reader:
-#     # print(reader)
-#     content = json.load(reader)
-# file = list(client, filename)
-
-# print(content)
-# print(len(content["news"]))
-#
-# conn = MongoClient("127.0.0.1")
-# mdb = conn.test
-# collection = mdb.xyz
-#
-# for content_single in content["news"]:
-#     print(content_single)
-#     collection.insert_one(content_single)

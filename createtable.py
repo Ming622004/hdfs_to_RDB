@@ -1,13 +1,21 @@
+# install mysqlclient
 import MySQLdb
 import cb104_addr
 
-papername = "apple"
+# apple storm CT udn
+papername = "CT"
 
-conn=MySQLdb.connect(host=cb104_addr.ray_MySQL_IP, user=cb104_addr.ray_MySQL_username,
-                     passwd=cb104_addr.ray_MySQL_password, db="news", charset="utf8")
-cursor=conn.cursor()           #傳回 Cursor 物件
+mariadb_db_name = "news_db"
+mariadb_db_table = papername + "_news"
+mariadb_host = cb104_addr.ray_MySQL_IP
+mariadb_user = cb104_addr.ray_MySQL_username
+mariadb_pw = cb104_addr.ray_MySQL_password
 
-SQL_CT = "CREATE TABLE " + papername + "_news(url varchar(255) PRIMARY KEY,\
+conn_rdb = MySQLdb.connect(host=mariadb_host, user=mariadb_user,
+                           passwd=mariadb_pw, db=mariadb_db_name, charset="utf8")
+cursor = conn_rdb.cursor()           #傳回 Cursor 物件
+
+SQL_CT = "CREATE TABLE IF NOT EXISTS " + mariadb_db_table + "(url varchar(255) PRIMARY KEY,\
          create_time DATETIME, \
          title varchar(255), \
          title_keyword_1 varchar(100), \
@@ -109,7 +117,7 @@ SQL_CT = "CREATE TABLE " + papername + "_news(url varchar(255) PRIMARY KEY,\
 
 cursor.execute(SQL_CT)
 
-conn.commit()
+conn_rdb.commit()
 
 cursor.close()
-conn.close()
+conn_rdb.close()
